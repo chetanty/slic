@@ -1,0 +1,17 @@
+#comment-section textarea {
+    font-size: 14px;
+    padding: 5px;
+  }
+  
+  #comment-section button {
+    background: #0078d7;
+    color: white;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+  }
+  
+  #comment-section button:hover {
+    background: #005a9e;
+  }
+  
