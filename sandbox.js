@@ -1,14 +1,5 @@
 // sandbox.js
 
-// Firebase Config
-const firebaseConfig = {
-  apiKey: "AIzaSyAJTnnk7RFKaLSvSAfBJBCGKEGcjlXD_sQ",
-  authDomain: "slic68.firebaseapp.com",
-  projectId: "slic68",
-  storageBucket: "slic68.firebasestorage.app",
-  messagingSenderId: "227163257971",
-  appId: "1:227163257971:web:06f547a209ab3f9b80be06",
-};
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
