@@ -1,7 +1,7 @@
 // content.js
 
 // ============================================================================
-// 1. ROBUST PROFANITY FILTER (Hex Encoded)
+// 1. ROBUST PROFANITY FILTER (Full Hex)
 // ============================================================================
 class Filter {
   constructor() {
@@ -71,6 +71,17 @@ function sendToSandbox(action, key, payload) {
   });
 }
 
+// -------------------- IDENTITY HELPER (NEW) -------------------- //
+async function getStableIdentity() {
+    try {
+        const response = await chrome.runtime.sendMessage({ action: "getIdentity" });
+        return response ? response.userId : null;
+    } catch (e) {
+        console.log("Could not fetch identity", e);
+        return null;
+    }
+}
+
 // -------------------- HELPERS -------------------- //
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -117,7 +128,7 @@ const styles = `
     --slic-shadow-float: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   }
 
-  /* --- Global Reset for Slic Components --- */
+  /* --- Global Reset --- */
   #slic-comment-section * {
     box-sizing: border-box !important;
   }
@@ -139,7 +150,6 @@ const styles = `
     box-sizing: border-box !important;
   }
 
-  /* Utility to hide the main box when minimized */
   #slic-comment-section.slic-hidden {
     opacity: 0;
     pointer-events: none;
@@ -158,10 +168,11 @@ const styles = `
     cursor: pointer;
     box-shadow: var(--slic-shadow-float);
     z-index: 2147483646; 
-    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: opacity 0.4s, transform 0.4s;
     opacity: 0;
     transform: scale(0.5) rotate(-90deg);
     pointer-events: none;
+    user-select: none;
   }
 
   #slic-minimize-btn.slic-visible {
@@ -182,9 +193,14 @@ const styles = `
     font-weight: 700; cursor: move;
   }
   
+  #slic-comment-section .slic-header-controls {
+    display: flex; align-items: center; gap: 8px;
+  }
+
   #slic-comment-section .slic-tabs { 
     display: flex; background: rgba(255,255,255,0.1); border-radius: 20px; padding: 3px; 
     backdrop-filter: blur(4px);
+    margin-right: 8px;
   }
   
   #slic-comment-section .slic-tab-btn {
@@ -197,11 +213,17 @@ const styles = `
     background: var(--slic-primary); color: white; box-shadow: 0 2px 10px rgba(219, 39, 119, 0.4);
   }
   
-  #slic-comment-section .slic-close-btn { 
+  #slic-comment-section .slic-close-btn, #slic-comment-section .slic-reload-btn { 
     background: none; border: none; color: rgba(255,255,255,0.5); 
-    font-size: 20px; cursor: pointer; padding: 0 0 0 12px; transition: color 0.2s;
+    font-size: 20px; cursor: pointer; transition: color 0.2s;
+    padding: 0; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px;
   }
-  #slic-comment-section .slic-close-btn:hover { color: white; }
+  #slic-comment-section .slic-close-btn:hover, #slic-comment-section .slic-reload-btn:hover { color: white; }
+
+  @keyframes slic-spin { 100% { transform: rotate(360deg); } }
+  .slic-reload-btn.rotating { animation: slic-spin 1s linear infinite; color: white !important; }
 
   /* --- Feed --- */
   #slic-comment-section .slic-feed {
@@ -217,7 +239,10 @@ const styles = `
   .slic-comment:hover { transform: translateY(-2px); }
 
   .slic-comment-meta { font-size: 11px; color: var(--slic-text-muted); margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .slic-author-row { display: flex; align-items: baseline; gap: 8px; }
   .slic-author { font-weight: 700; color: var(--slic-text-main); font-size: 13px; }
+  .slic-user-tag { font-size: 10px; color: #94a3b8; font-family: monospace; letter-spacing: 0.5px; }
+
   .slic-text { font-size: 14px; margin-bottom: 8px; color: #334155; }
   
   /* --- Actions --- */
@@ -225,6 +250,9 @@ const styles = `
   .slic-reply-btn { background: none; border: none; color: var(--slic-text-muted); font-size: 11px; font-weight: 600; cursor: pointer; padding: 0; text-transform: uppercase; }
   .slic-reply-btn:hover { color: var(--slic-primary); }
   
+  .slic-delete-btn { background: none; border: none; font-size: 14px; cursor: pointer; margin-left: 8px; opacity: 0.4; transition: opacity 0.2s; color: #64748b; padding: 0; }
+  .slic-delete-btn:hover { opacity: 1; color: #ef4444; }
+
   .slic-vote-group { display: flex; gap: 6px; align-items: center; background: #f1f5f9; padding: 4px 8px; border-radius: 8px; }
   .slic-vote-btn { background: none; border: none; cursor: pointer; font-size: 12px; padding: 0; color: #94a3b8; transition: transform 0.2s; }
   .slic-vote-btn:hover { transform: scale(1.2); }
@@ -243,11 +271,16 @@ const styles = `
 
   /* --- Footer & INPUT RESET --- */
   #slic-comment-section .slic-footer { padding: 16px 20px; background: #fff; border-top: 1px solid #f1f5f9; }
-  .slic-user-row { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
   
-  /* --- BULLETPROOF INPUT STYLES (Overrides website CSS) --- */
+  .slic-user-row { margin-bottom: 12px; position: relative; }
+  .slic-my-tag-label { 
+      font-size: 10px; color: #94a3b8; font-family: monospace; 
+      position: absolute; top: -16px; left: 0;
+  }
+
+  /* --- BULLETPROOF INPUT STYLES --- */
   .slic-input-name { 
-    flex: 1; 
+    width: 100% !important;
     border: 1px solid #e2e8f0 !important; 
     border-radius: 8px !important; 
     padding: 8px 12px !important; 
@@ -293,34 +326,65 @@ const styles = `
   
   .slic-replying-to { font-size: 11px; color: var(--slic-primary); display: none; margin-bottom: 6px; }
   .slic-cancel-reply { cursor: pointer; margin-left: 5px; opacity: 0.7; }
+
+  /* --- CONTEXT MENU --- */
+  .slic-context-menu {
+    position: fixed;
+    background: white;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    padding: 5px;
+    z-index: 2147483648; 
+    display: flex;
+    flex-direction: column;
+    width: 150px;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  .slic-context-item {
+    padding: 8px 12px;
+    font-size: 13px;
+    color: #ef4444; 
+    cursor: pointer;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .slic-context-item:hover {
+    background: #fef2f2;
+  }
 `;
 
 // -------------------- LOGIC -------------------- //
 async function createCommentBox() {
   if (document.getElementById("slic-comment-section")) return;
 
+  const myStableId = await getStableIdentity();
+
   const styleTag = document.createElement("style");
   styleTag.textContent = styles;
   document.head.appendChild(styleTag);
 
-  // Minimize Button
   const minimizeBtn = document.createElement("div");
   minimizeBtn.id = "slic-minimize-btn";
+  minimizeBtn.className = "slic-visible"; 
   minimizeBtn.textContent = "S"; 
   document.body.appendChild(minimizeBtn);
 
-  // Main Container
   const container = document.createElement("div");
   container.id = "slic-comment-section";
+  container.className = "slic-hidden"; 
   
   container.innerHTML = `
     <div class="slic-header">
       <span>Slic Chat</span>
-      <div class="slic-tabs">
-        <button class="slic-tab-btn active" data-tab="domain">Domain</button>
-        <button class="slic-tab-btn" data-tab="page">Page</button>
+      <div class="slic-header-controls">
+        <div class="slic-tabs">
+            <button class="slic-tab-btn" data-tab="domain">Domain</button>
+            <button class="slic-tab-btn active" data-tab="page">Page</button>
+        </div>
+        <button class="slic-reload-btn" title="Reload Comments">↻</button>
+        <button class="slic-close-btn" title="Minimize">✕</button>
       </div>
-      <button class="slic-close-btn">✕</button>
     </div>
     <div class="slic-feed" id="slic-feed">
       </div>
@@ -329,6 +393,7 @@ async function createCommentBox() {
         Replying to comment... <span class="slic-cancel-reply">Cancel</span>
       </div>
       <div class="slic-user-row">
+        <span class="slic-my-tag-label" id="slic-my-tag"></span>
         <input type="text" id="slic-username" class="slic-input-name" placeholder="Enter your name..." />
       </div>
       <div class="slic-input-wrap">
@@ -342,14 +407,16 @@ async function createCommentBox() {
 
   const feed = document.getElementById("slic-feed");
   const closeBtn = container.querySelector(".slic-close-btn");
+  const reloadBtn = container.querySelector(".slic-reload-btn");
   const tabBtns = container.querySelectorAll(".slic-tab-btn");
   const nameInput = document.getElementById("slic-username");
   const textInput = document.getElementById("slic-text");
   const submitBtn = document.getElementById("slic-submit");
   const replyIndicator = document.getElementById("slic-reply-indicator");
   const cancelReplyBtn = container.querySelector(".slic-cancel-reply");
+  const myTagLabel = document.getElementById("slic-my-tag");
 
-  let currentTab = "domain";
+  let currentTab = "page";
   let replyingToId = null;
 
   let isDragging = false, offsetX, offsetY;
@@ -360,25 +427,59 @@ async function createCommentBox() {
     offsetX = e.clientX - container.offsetLeft;
     offsetY = e.clientY - container.offsetTop;
   });
+  
+  let isBtnDragging = false, btnOffsetX, btnOffsetY, btnHasMoved = false;
+  minimizeBtn.addEventListener("mousedown", (e) => {
+      if (e.button === 2) return; 
+      isBtnDragging = true;
+      btnHasMoved = false; 
+      const rect = minimizeBtn.getBoundingClientRect();
+      btnOffsetX = e.clientX - rect.left;
+      btnOffsetY = e.clientY - rect.top;
+      minimizeBtn.style.bottom = "auto";
+      minimizeBtn.style.right = "auto";
+      minimizeBtn.style.left = `${rect.left}px`;
+      minimizeBtn.style.top = `${rect.top}px`;
+  });
+
   document.addEventListener("mousemove", (e) => {
     if (isDragging) {
       container.style.left = `${e.clientX - offsetX}px`;
       container.style.top = `${e.clientY - offsetY}px`;
     }
+    if (isBtnDragging) {
+        btnHasMoved = true;
+        minimizeBtn.style.left = `${e.clientX - btnOffsetX}px`;
+        minimizeBtn.style.top = `${e.clientY - btnOffsetY}px`;
+    }
   });
-  document.addEventListener("mouseup", () => isDragging = false);
+
+  document.addEventListener("mouseup", () => {
+      isDragging = false;
+      isBtnDragging = false;
+  });
 
   const savedName = localStorage.getItem("slic-username");
   if (savedName) nameInput.value = savedName;
 
-  // Minimize Logic
   closeBtn.onclick = () => {
       container.classList.add("slic-hidden");
       minimizeBtn.classList.add("slic-visible");
   };
-  minimizeBtn.onclick = () => {
+  
+  minimizeBtn.onclick = (e) => {
+      if (e.button === 2) return; 
+      if (btnHasMoved) return; 
       container.classList.remove("slic-hidden");
       minimizeBtn.classList.remove("slic-visible");
+  };
+
+  reloadBtn.onclick = async () => {
+      reloadBtn.classList.add("rotating");
+      await loadComments();
+      setTimeout(() => {
+        reloadBtn.classList.remove("rotating");
+      }, 500);
   };
 
   tabBtns.forEach(btn => {
@@ -390,7 +491,6 @@ async function createCommentBox() {
     };
   });
 
-  // Reply Cancel Logic
   cancelReplyBtn.onclick = () => {
     replyingToId = null;
     replyIndicator.style.display = "none";
@@ -400,6 +500,40 @@ async function createCommentBox() {
   nameInput.addEventListener("change", (e) => {
     localStorage.setItem("slic-username", e.target.value.trim());
   });
+
+  const handleRightClick = (e) => {
+    e.preventDefault();
+    const existingMenu = document.querySelector('.slic-context-menu');
+    if (existingMenu) existingMenu.remove();
+
+    const menu = document.createElement("div");
+    menu.className = "slic-context-menu";
+    menu.style.left = `${e.clientX}px`;
+    menu.style.top = `${e.clientY}px`;
+    
+    const closeOption = document.createElement("div");
+    closeOption.className = "slic-context-item";
+    closeOption.innerText = "Close Completely";
+    closeOption.onclick = () => {
+        container.remove();
+        minimizeBtn.remove();
+        styleTag.remove();
+        menu.remove();
+    };
+    
+    menu.appendChild(closeOption);
+    document.body.appendChild(menu);
+
+    const closeMenu = () => {
+        if(menu && menu.parentNode) menu.remove();
+        document.removeEventListener("click", closeMenu);
+    };
+    setTimeout(() => document.addEventListener("click", closeMenu), 0);
+  };
+
+  container.addEventListener("contextmenu", handleRightClick);
+  minimizeBtn.addEventListener("contextmenu", handleRightClick);
+
 
   submitBtn.onclick = async () => {
     const author = nameInput.value.trim();
@@ -411,6 +545,30 @@ async function createCommentBox() {
       return;
     }
     if (!text) return;
+
+    // --- NEW VALIDATION: Username Length ---
+    if (author.length < 2 || author.length > 32) {
+        alert("Username must be between 2 and 32 characters.");
+        return;
+    }
+
+    // --- NEW VALIDATION: No Code in Username ---
+    if (/<[a-z][\s\S]*>/i.test(author) || (/\{[\s\S]*\}/.test(author) && (author.includes(":") || author.includes(";")))) {
+        alert("Invalid username (Code detected).");
+        return;
+    }
+
+    // --- NEW VALIDATION: Comment Length ---
+    if (text.length > 1000) {
+        alert(`Comment too long (${text.length}/1000 characters).`);
+        return;
+    }
+
+    // --- NEW VALIDATION: No Code in Comment ---
+    if (/<[a-z][\s\S]*>/i.test(text) || (/\{[\s\S]*\}/.test(text) && (text.includes(":") || text.includes(";")))) {
+        alert("Code is not allowed.");
+        return;
+    }
 
     const isBadText = chatFilter.isProfane(text);
     const isBadAuthor = chatFilter.isProfane(author);
@@ -436,16 +594,20 @@ async function createCommentBox() {
 
     const newComment = {
       id: generateId(),
-      parentId: replyingToId, // Ensures threading works
+      parentId: replyingToId, 
       author: author,
       text: text,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      userId: myStableId // PASS STABLE ID
     };
 
     const key = getKey();
     const result = await sendToSandbox("saveComment", key, newComment);
 
-    if (result) {
+    if (result && result.success) {
+      if(result.userTag) {
+          myTagLabel.innerText = result.userTag;
+      }
       textInput.value = "";
       replyingToId = null;
       replyIndicator.style.display = "none";
@@ -466,9 +628,19 @@ async function createCommentBox() {
     return `page_${sanitize(domain + url.pathname)}`;
   }
 
+  async function loadMyTag() {
+      const tag = await sendToSandbox("getMyTag", null, { userId: myStableId });
+      if (tag) {
+          myTagLabel.innerText = tag;
+      }
+  }
+
   async function loadComments() {
-    feed.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">Loading...</div>';
-    const comments = await sendToSandbox("getComments", getKey());
+    if(feed.innerHTML.trim() === "") {
+        feed.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">Loading...</div>';
+    }
+    
+    const comments = await sendToSandbox("getComments", getKey(), { userId: myStableId });
     const validComments = comments.filter(c => typeof c === 'object');
 
     if (validComments.length === 0) {
@@ -501,7 +673,6 @@ async function createCommentBox() {
   function createCommentNode(data) {
     const el = document.createElement("div");
     
-    // --- THREADING LOGIC ---
     const isReply = !!data.parentId;
     if(isReply) {
         el.className = "slic-thread"; 
@@ -512,11 +683,19 @@ async function createCommentBox() {
     
     const likes = data.likes || 0;
     const dislikes = data.dislikes || 0;
+    const isMyComment = (data.ownerId && data.ownerId === myStableId);
+    const userTagDisplay = data.userTag ? `<span class="slic-user-tag">${data.userTag}</span>` : '';
 
     commentCard.innerHTML = `
       <div class="slic-comment-meta">
-        <span class="slic-author">${data.author}</span>
-        <span>${timeSince(new Date(data.timestamp))}</span>
+        <div class="slic-author-row">
+            <span class="slic-author">${data.author}</span>
+            ${userTagDisplay}
+        </div>
+        <span>
+            ${timeSince(new Date(data.timestamp))}
+            ${isMyComment ? `<button class="slic-delete-btn" title="Delete Comment">🗑</button>` : ''}
+        </span>
       </div>
       <div class="slic-text">${data.text}</div>
       <div class="slic-actions">
@@ -530,13 +709,11 @@ async function createCommentBox() {
       </div>
     `;
 
-    // Reply Handler
     commentCard.querySelector(".slic-reply-btn").onclick = () => {
       replyingToId = data.id;
       replyIndicator.style.display = "block";
       replyIndicator.innerHTML = `Replying to <b>${data.author}</b> <span class="slic-cancel-reply" style="cursor:pointer; text-decoration:underline; margin-left:5px;">Cancel</span>`;
       
-      // Re-attach cancel listener
       replyIndicator.querySelector(".slic-cancel-reply").onclick = () => {
         replyingToId = null;
         replyIndicator.style.display = "none";
@@ -546,7 +723,22 @@ async function createCommentBox() {
       textInput.placeholder = `Replying to ${data.author}...`;
     };
 
-    // Voting Logic
+    if (isMyComment) {
+        commentCard.querySelector(".slic-delete-btn").onclick = async () => {
+            if (confirm("Delete this comment and all its replies?")) {
+                const result = await sendToSandbox("deleteComment", getKey(), { 
+                    commentId: data.id,
+                    userId: myStableId 
+                });
+                if(result) {
+                    await loadComments();
+                } else {
+                    alert("Failed to delete comment.");
+                }
+            }
+        };
+    }
+
     const upBtn = commentCard.querySelector(".slic-vote-btn.up");
     const downBtn = commentCard.querySelector(".slic-vote-btn.down");
     const likeCountSpan = commentCard.querySelector(".slic-like-count");
@@ -616,6 +808,7 @@ async function createCommentBox() {
     return el;
   }
 
+  loadMyTag(); 
   loadComments();
 }
 
