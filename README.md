@@ -1,32 +1,30 @@
-# Slic | Comment Everywhere 💬
+# Slic | Comment Everywhere
 
 ![Version](https://img.shields.io/badge/version-1.6-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
 ![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-available-4285F4?logo=google-chrome&logoColor=white)
 
 **Slic** is a lightweight Chrome Extension that turns the entire internet into a discussion board. It injects a clean, non-intrusive chat sidebar into any website you visit, allowing you to connect with other users browsing the same content instantly.
 
-[**👉 Download from Chrome Web Store**](https://chromewebstore.google.com/detail/slic-comment-section/pjmoebejmcbbdgbchmnfdanncfdejppl?hl=en-US&utm_source=ext_sidebar)
+[**Download from Chrome Web Store**](https://chromewebstore.google.com/detail/slic-comment-section/pjmoebejmcbbdgbchmnfdanncfdejppl?hl=en-US&utm_source=ext_sidebar)
 
 ---
 
-## ✨ Features
+## Features
 
-* **🌍 Universal Chat:** Works on any URL—from YouTube videos to Wikipedia articles.
-* **📑 Context Aware:**
+* **Universal Chat:** Works on any URL—from YouTube videos to Wikipedia articles.
+* **Context Aware:**
     * **Page Mode:** Chat specifically about the exact URL you are viewing.
     * **Domain Mode:** Chat with everyone on the entire website (e.g., all users on `reddit.com`).
-* **🆔 Stable Identity:** No login required. Generates a unique, anonymous tag (e.g., `XY#1234`) based on your browser profile that persists across reloads and browser restarts.
-* **🔒 Secure & Safe:**
+* **Stable Identity:** No login required. Generates a unique, anonymous tag (e.g., `XY#1234`) based on your browser profile that persists across reloads and browser restarts.
+* **Secure & Safe:**
     * **XSS Protection:** Strict sanitization blocks all HTML, CSS, and JS injection.
     * **Profanity Filter:** Built-in robust hex-encoded filter to keep chats clean.
     * **Ownership:** You can delete your own comments and threads.
-* **⚡ Real-time:** Powered by Firebase Firestore for instant updates.
+* **Real-time:** Powered by Firebase Firestore for instant updates.
 
 ---
 
-
-## 🛠️ Architecture & Security
+## Architecture & Security
 
 ### How it works
 1.  **Identity:** The extension uses `chrome.identity` and `chrome.storage.sync` to create a stable, anonymous User ID for you. This ID travels with your Chrome Profile, so your username tag persists across devices.
@@ -43,7 +41,7 @@
 
 ---
 
-## 🛡️ Privacy Policy
+## Privacy Policy
 
 Slic is designed with privacy as a priority:
 * **No Tracking:** We do not track your browsing history. We only look at the current URL hash to load the correct chat room.
@@ -52,7 +50,7 @@ Slic is designed with privacy as a priority:
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
 
@@ -63,6 +61,10 @@ Pull requests are welcome! For major changes, please open an issue first to disc
 5.  Open a Pull Request
 
 ---
+
+### Wiki & Documentation
+For more detailed documentation, please visit the Wiki:
+[https://chetantyagi.com/slic/](https://chetantyagi.com/slic/)
 
 ### License
 Distributed under the MIT License. See `LICENSE` for more information.
